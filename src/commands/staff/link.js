@@ -3,6 +3,7 @@ import { DiscordAPIError, Constants } from 'discord.js';
 import { stripIndents } from 'common-tags';
 import { hypixel } from '../../api/hypixel.js';
 import { mojang } from '../../api/mojang.js';
+import { HISTORY_DATA_KEYS } from '../../constants/index.js';
 import { requiredIgnOption } from '../../structures/commands/commonOptions.js';
 import { InteractionUtil } from '../../util/index.js';
 import { logger, validateNumber } from '../../functions/index.js';
@@ -56,6 +57,9 @@ export default class LinkCommand extends SlashCommand {
 					defaults: {
 						ign,
 						guildId,
+					},
+					attributes: {
+						exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 					},
 				}))?.[0];
 		}

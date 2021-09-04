@@ -49,6 +49,11 @@ export const COSMETIC_SKILLS = Object.freeze([
 	'runecrafting',
 ]);
 
+export const SKILLS_INCL_COSMETIC = Object.freeze([
+	...SKILLS,
+	...COSMETIC_SKILLS,
+]);
+
 export const SKILL_ACHIEVEMENTS = Object.freeze({
 	farming: 'skyblock_harvester',
 	mining: 'skyblock_excavator',

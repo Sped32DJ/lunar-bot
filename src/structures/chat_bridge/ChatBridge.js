@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { setTimeout as sleep } from 'timers/promises';
+import { HISTORY_DATA_KEYS } from '../../constants/index.js';
 import { CHAT_FUNCTION_BY_TYPE, INVISIBLE_CHARACTERS, MESSAGE_TYPES, PREFIX_BY_TYPE } from './constants/index.js';
 import { MinecraftChatManager } from './managers/MinecraftChatManager.js';
 import { DiscordManager } from './managers/DiscordManager.js';
@@ -158,6 +159,9 @@ export class ChatBridge extends EventEmitter {
 					where: { minecraftUuid: this.minecraft.botUuid },
 					defaults: {
 						ign: this.bot.username,
+					},
+					attributes: {
+						exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 					},
 				});
 

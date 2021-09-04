@@ -53,3 +53,28 @@ export const DUNGEON_EXPONENTS = Object.freeze({
  * lily
  * https://github.com/Antonio32A/lilyweight
  */
+
+import { readFile } from 'fs/promises';
+
+const { skillRatioWeight } = JSON.parse(await readFile('node_modules/lilyweight/lib/constants.json'));
+
+export const LILY_SKILLS = Object.keys(skillRatioWeight);
+
+export const LILY_CATACOMBS = Object.freeze([
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+	7,
+]);
+
+export const LILY_MASTER_CATACOMBS = Object.freeze([
+	1,
+	2,
+	3,
+	4,
+	5,
+	6,
+]);

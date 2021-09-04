@@ -1,3 +1,4 @@
+import { DATA_KEYS } from '../constants/index.js';
 import { logger } from './index.js';
 
 
@@ -16,4 +17,12 @@ export function mutedCheck(model) {
 	}
 
 	return false;
+}
+
+/**
+ * returns values for a player db transaction
+ * @param {string} offset
+ */
+export function buildNullDataTransactions(offset) {
+	return Object.fromEntries(Object.keys(DATA_KEYS).map(key => [ `${key}${offset}`, null ]));
 }

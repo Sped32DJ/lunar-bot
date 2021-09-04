@@ -1,3 +1,5 @@
+import pkg from 'sequelize';
+const { DataTypes } = pkg;
 import {
 	CATACOMBS_ROLES,
 	DELIMITER_ROLES,
@@ -153,12 +155,19 @@ export const XP_OFFSETS_TIME = Object.freeze({
 
 export const SKYBLOCK_DATA = Object.freeze(transformAPIData());
 
-export const XP_TYPES = Object.freeze(Object.keys(SKYBLOCK_DATA).filter(key => key.endsWith('Xp') || key.startsWith('dungeon')));
+export const DATA_KEYS = Object.freeze({
+	skyBlockData: DataTypes.JSONB,
+	guildXp: DataTypes.INTEGER,
+});
 
-export const HISTORY_KEYS = Object.freeze([
-	'skyBlockData',
-	'guildXp',
-].map(key => [ key, `${key}History` ]));
+export const HISTORY_DATA_KEYS = Object.freeze(Object.keys(DATA_KEYS).map(key => `${key}History`));
+
+export const DATA_DEFAULTS = Object.freeze({
+	get skyBlockData() {
+		return { ...SKYBLOCK_DATA };
+	},
+	guildXp: 0,
+});
 
 
 export const UNKNOWN_IGN = 'UNKNOWN_IGN';

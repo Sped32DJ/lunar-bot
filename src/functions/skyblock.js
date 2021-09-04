@@ -5,6 +5,9 @@ import {
 	DUNGEON_TYPES_AND_CLASSES,
 	DUNGEON_XP,
 	DUNGEON_XP_TOTAL,
+	LILY_CATACOMBS,
+	LILY_MASTER_CATACOMBS,
+	LILY_SKILLS,
 	RUNECRAFTING_XP,
 	SKILL_ACHIEVEMENTS,
 	SKILL_CAP,
@@ -27,81 +30,75 @@ import { hypixel } from '../api/hypixel.js';
  */
 
 /**
- * @param {import('@zikeji/hypixel').Components.Schemas.SkyBlockProfileMember} [skyblockMember]
+ * extended parameter type until @zikeji/hypixel gets updated
+ * @param {import('@zikeji/hypixel').Components.Schemas.SkyBlockProfileMember & { jacob2: { perks: { farming_level_cap: number } } }} [skyblockMember]
  */
 export function transformAPIData(skyblockMember = {}) {
 	return {
 		/**
 		 * skills
 		 */
-		skillXp: {
-			// sorted as expected by getLilyWeightRaw
-			enchanting: skyblockMember.experience_skill_enchanting ?? 0,
-			taming: skyblockMember.experience_skill_taming ?? 0,
-			alchemy: skyblockMember.experience_skill_alchemy ?? 0,
-			mining: skyblockMember.experience_skill_mining ?? 0,
-			farming: skyblockMember.experience_skill_farming ?? 0,
-			foraging: skyblockMember.experience_skill_foraging ?? 0,
-			combat: skyblockMember.experience_skill_combat ?? 0,
-			fishing: skyblockMember.experience_skill_fishing ?? 0,
+		// sorted as expected by getLilyWeightRaw
+		enchanting: skyblockMember.experience_skill_enchanting ?? 0,
+		taming: skyblockMember.experience_skill_taming ?? 0,
+		alchemy: skyblockMember.experience_skill_alchemy ?? 0,
+		mining: skyblockMember.experience_skill_mining ?? 0,
+		farming: skyblockMember.experience_skill_farming ?? 0,
+		foraging: skyblockMember.experience_skill_foraging ?? 0,
+		combat: skyblockMember.experience_skill_combat ?? 0,
+		fishing: skyblockMember.experience_skill_fishing ?? 0,
 
-			// cosmetic skills
-			carpentry: skyblockMember.experience_skill_carpentry ?? 0,
-			runecrafting: skyblockMember.experience_skill_runecrafting ?? 0,
-		},
+		// cosmetic skills
+		carpentry: skyblockMember.experience_skill_carpentry ?? 0,
+		runecrafting: skyblockMember.experience_skill_runecrafting ?? 0,
+
+		// additional info
 		skillApiEnabled: Reflect.has(skyblockMember, 'experience_skill_mining'),
 		farmingLevelCap: 50 + (skyblockMember.jacob2?.perks?.farming_level_cap ?? 0),
 
 		/**
 		 * slayers
 		 */
-		slayerXp: {
-			zombie: skyblockMember.slayer_bosses?.zombie?.xp ?? 0,
-			wolf: skyblockMember.slayer_bosses?.wolf?.xp ?? 0,
-			spider: skyblockMember.slayer_bosses?.spider?.xp ?? 0,
-			enderman: skyblockMember.slayer_bosses?.enderman?.xp ?? 0,
-		},
+		zombie: skyblockMember.slayer_bosses?.zombie?.xp ?? 0,
+		wolf: skyblockMember.slayer_bosses?.wolf?.xp ?? 0,
+		spider: skyblockMember.slayer_bosses?.spider?.xp ?? 0,
+		enderman: skyblockMember.slayer_bosses?.enderman?.xp ?? 0,
 
 		/**
 		 * dungeons
 		 */
-		dungeonXp: {
-			// types
-			catacombs: skyblockMember.dungeons?.dungeon_types?.catacombs?.experience ?? 0,
+		// types
+		catacombs: skyblockMember.dungeons?.dungeon_types?.catacombs?.experience ?? 0,
 
-			// classes
-			archer: skyblockMember.dungeons?.player_classes?.archer?.experience ?? 0,
-			berserk: skyblockMember.dungeons?.player_classes?.berserk?.experience ?? 0,
-			healer: skyblockMember.dungeons?.player_classes?.healer?.experience ?? 0,
-			mage: skyblockMember.dungeons?.player_classes?.mage?.experience ?? 0,
-			tank: skyblockMember.dungeons?.player_classes?.tank?.experience ?? 0,
-		},
-		dungeonCompletions: {
-			normal: {
-				1: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[1] ?? 0,
-				2: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[2] ?? 0,
-				3: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[3] ?? 0,
-				4: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[4] ?? 0,
-				5: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[5] ?? 0,
-				6: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[6] ?? 0,
-				7: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[7] ?? 0,
-				8: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[8] ?? 0,
-				9: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[9] ?? 0,
-				10: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[10] ?? 0,
-			},
-			master: {
-				1: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[1] ?? 0,
-				2: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[2] ?? 0,
-				3: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[3] ?? 0,
-				4: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[4] ?? 0,
-				5: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[5] ?? 0,
-				6: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[6] ?? 0,
-				7: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[7] ?? 0,
-				8: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[8] ?? 0,
-				9: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[9] ?? 0,
-				10: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[10] ?? 0,
-			},
-		},
+		// classes
+		archer: skyblockMember.dungeons?.player_classes?.archer?.experience ?? 0,
+		berserk: skyblockMember.dungeons?.player_classes?.berserk?.experience ?? 0,
+		healer: skyblockMember.dungeons?.player_classes?.healer?.experience ?? 0,
+		mage: skyblockMember.dungeons?.player_classes?.mage?.experience ?? 0,
+		tank: skyblockMember.dungeons?.player_classes?.tank?.experience ?? 0,
+
+		// floor completions
+		catacombsFloor1: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[1] ?? 0,
+		catacombsFloor2: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[2] ?? 0,
+		catacombsFloor3: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[3] ?? 0,
+		catacombsFloor4: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[4] ?? 0,
+		catacombsFloor5: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[5] ?? 0,
+		catacombsFloor6: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[6] ?? 0,
+		catacombsFloor7: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[7] ?? 0,
+		catacombsFloor8: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[8] ?? 0,
+		catacombsFloor9: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[9] ?? 0,
+		catacombsFloor10: skyblockMember.dungeons?.dungeon_types?.catacombs?.tier_completions?.[10] ?? 0,
+
+		masterCatacombsFloor1: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[1] ?? 0,
+		masterCatacombsFloor2: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[2] ?? 0,
+		masterCatacombsFloor3: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[3] ?? 0,
+		masterCatacombsFloor4: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[4] ?? 0,
+		masterCatacombsFloor5: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[5] ?? 0,
+		masterCatacombsFloor6: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[6] ?? 0,
+		masterCatacombsFloor7: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[7] ?? 0,
+		masterCatacombsFloor8: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[8] ?? 0,
+		masterCatacombsFloor9: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[9] ?? 0,
+		masterCatacombsFloor10: skyblockMember.dungeons?.dungeon_types?.master_catacombs?.tier_completions?.[10] ?? 0,
 	};
 }
 
@@ -113,7 +110,7 @@ export function transformAPIData(skyblockMember = {}) {
 export async function addAchievementsData(skyBlockData, minecraftUuid) {
 	const { achievements } = await hypixel.player.uuid(minecraftUuid);
 
-	for (const skill of SKILLS) skyBlockData.skillXp[skill] = SKILL_XP_TOTAL[achievements?.[SKILL_ACHIEVEMENTS[skill]] ?? 0] ?? 0;
+	for (const skill of SKILLS) skyBlockData[skill] = SKILL_XP_TOTAL[achievements?.[SKILL_ACHIEVEMENTS[skill]] ?? 0] ?? 0;
 }
 
 /**
@@ -123,19 +120,17 @@ export async function addAchievementsData(skyBlockData, minecraftUuid) {
  * @param {number} [levelCap] (individual) level cap for the player
  */
 export function getSkillLevel(type, skyBlockData, levelCap = type === 'farming' ? skyBlockData.farmingLevelCap : SKILL_CAP[type]) {
-	let xp;
+	const XP = skyBlockData[type];
+
 	let xpTable;
 
 	if (SKILLS.includes(type) || type === 'carpentry') {
-		xp = skyBlockData.skillXp[type];
 		xpTable = levelCap > 50
 			? { ...SKILL_XP_PAST_50, ...SKILL_XP }
 			: SKILL_XP;
 	} else if (type === 'runecrafting') {
-		xp = skyBlockData.skillXp[type];
 		xpTable = RUNECRAFTING_XP;
 	} else if (DUNGEON_TYPES_AND_CLASSES.includes(type)) {
-		xp = skyBlockData.dungeonXp[type];
 		xpTable = DUNGEON_XP;
 	} else {
 		throw new Error(`[GET SKILL LEVEL]: unknown type '${type}'`);
@@ -145,10 +140,11 @@ export function getSkillLevel(type, skyBlockData, levelCap = type === 'farming' 
 
 	let xpTotal = 0;
 	let trueLevel = 0;
+
 	for (let x = 1; x <= MAX_LEVEL; ++x) {
 		xpTotal += xpTable[x];
 
-		if (xpTotal > xp) {
+		if (xpTotal > XP) {
 			xpTotal -= xpTable[x];
 			break;
 		} else {
@@ -157,7 +153,7 @@ export function getSkillLevel(type, skyBlockData, levelCap = type === 'farming' 
 	}
 
 	if (trueLevel < MAX_LEVEL) {
-		const nonFlooredLevel = trueLevel + (Math.floor(xp - xpTotal) / xpTable[trueLevel + 1]);
+		const nonFlooredLevel = trueLevel + (Math.floor(XP - xpTotal) / xpTable[trueLevel + 1]);
 
 		return {
 			trueLevel,
@@ -179,7 +175,7 @@ export function getSkillLevel(type, skyBlockData, levelCap = type === 'farming' 
  * @param {skyBlockData} skyBlockData
  */
 export function getSlayerLevel(type, skyBlockData) {
-	const XP = skyBlockData.slayerXp[type];
+	const XP = skyBlockData[type];
 	const MAX_LEVEL = Math.max(...Object.keys(SLAYER_XP));
 
 	let level = 0;
@@ -196,7 +192,7 @@ export function getSlayerLevel(type, skyBlockData) {
  * @param {skyBlockData} skyBlockData
  */
 export function getTotalSlayerXp(skyBlockData) {
-	return Object.values(skyBlockData.slayerXp).reduce((acc, xp) => acc + xp, 0);
+	return SLAYERS.reduce((acc, slayer) => acc + skyBlockData[slayer], 0);
 }
 
 /**
@@ -244,7 +240,7 @@ export function getSenitherWeight(skyBlockData) {
  * @param {skyBlockData} skyBlockData
  */
 export function getSenitherSkillWeight(skillType, skyBlockData) {
-	const XP = skyBlockData.skillXp[skillType];
+	const XP = skyBlockData[skillType];
 	const { nonFlooredLevel: LEVEL } = getSkillLevel(skillType, skyBlockData, SKILL_CAP[skillType]);
 	const MAX_XP = SKILL_XP_TOTAL[SKILL_CAP[skillType]] ?? Infinity;
 
@@ -261,7 +257,7 @@ export function getSenitherSkillWeight(skillType, skyBlockData) {
  * @param {skyBlockData} skyBlockData
  */
 export function getSenitherSlayerWeight(slayerType, skyBlockData) {
-	const XP = skyBlockData.slayerXp[slayerType];
+	const XP = skyBlockData[slayerType];
 
 	if (XP <= 1_000_000) {
 		return {
@@ -301,7 +297,7 @@ export function getSenitherSlayerWeight(slayerType, skyBlockData) {
  * @param {skyBlockData} skyBlockData
  */
 export function getSenitherDungeonWeight(dungeonType, skyBlockData) {
-	const XP = skyBlockData.dungeonXp[dungeonType];
+	const XP = skyBlockData[dungeonType];
 	const { nonFlooredLevel: LEVEL } = getSkillLevel(dungeonType, skyBlockData);
 	const DUNGEON_WEIGHT = (LEVEL ** 4.5) * (DUNGEON_EXPONENTS[dungeonType] ?? 0);
 	const MAX_XP = DUNGEON_XP_TOTAL[DUNGEON_CAP[dungeonType]] ?? Infinity;
@@ -326,13 +322,12 @@ export const { getWeightRaw: getLilyWeightRaw } = lilyweight();
  */
 export function getLilyWeight(skyBlockData) {
 	const { total, skill: { overflow } } = getLilyWeightRaw(
-		Object.keys(skyBlockData.skillXp).slice(0, -2)
-			.map(skill => getSkillLevel(skill, skyBlockData, SKILL_CAP[skill]).trueLevel), // skill levels
-		Object.values(skyBlockData.skillXp).slice(0, -2), // skill xp
-		Object.fromEntries(Object.entries(skyBlockData.dungeonCompletions.normal).slice(0, 7)), // catacombs completions
-		Object.fromEntries(Object.entries(skyBlockData.dungeonCompletions.master).slice(0, 6)), // master catacombs completions
-		skyBlockData.dungeonXp.catacombs, // catacombs xp
-		Object.values(skyBlockData.slayerXp), // slayer xp
+		LILY_SKILLS.map(skill => getSkillLevel(skill, skyBlockData, 60).trueLevel), // skill levels
+		LILY_SKILLS.map(skill => skyBlockData[skill]), // skill xp
+		LILY_CATACOMBS.map(floor => skyBlockData[`catacombsFloor${floor}`]), // catacombs completions
+		LILY_MASTER_CATACOMBS.map(floor => skyBlockData[`masterCatacombsFloor${floor}`]), // master catacombs completions
+		skyBlockData.catacombs, // catacombs XP
+		SLAYERS.map(slayer => skyBlockData[slayer]), // slayer XP
 	);
 
 	return {

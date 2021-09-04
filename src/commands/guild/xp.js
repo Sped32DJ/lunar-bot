@@ -1,10 +1,18 @@
 import { SlashCommandBuilder } from '@discordjs/builders';
 import { MessageEmbed, Formatters } from 'discord.js';
 import { oneLine, stripIndents } from 'common-tags';
-import { COSMETIC_SKILLS, DUNGEON_TYPES_AND_CLASSES, SKILLS, SLAYERS, XP_OFFSETS_CONVERTER, XP_OFFSETS_TIME } from '../../constants/index.js';
+import {
+	COSMETIC_SKILLS,
+	DUNGEON_TYPES_AND_CLASSES,
+	SKILLS,
+	SLAYERS,
+	X_EMOJI,
+	XP_OFFSETS_CONVERTER,
+	XP_OFFSETS_TIME,
+} from '../../constants/index.js';
 import { optionalPlayerOption, pageOption, offsetOption } from '../../structures/commands/commonOptions.js';
 import { InteractionUtil, MessageEmbedUtil } from '../../util/index.js';
-import { getDefaultOffset, upperCaseFirstChar } from '../../functions/index.js';
+import { logger, getDefaultOffset, upperCaseFirstChar } from '../../functions/index.js';
 import { SlashCommand } from '../../structures/commands/SlashCommand.js';
 
 
@@ -34,11 +42,11 @@ export default class XpCommand extends SlashCommand {
 		const OFFSET = interaction.options.getString('offset') ?? getDefaultOffset(this.config);
 		const player = InteractionUtil.getPlayer(interaction, true);
 
-		if (!player) {
+		if (!player?.skyBlockData) {
 			return await InteractionUtil.reply(interaction, oneLine`${interaction.options.get('player')
 				? `\`${interaction.options.getString('player')}\` is`
 				: 'you are'
-			} not in the player db`);
+			} not being tracked by the bot`);
 		}
 
 		// update db?
@@ -57,21 +65,20 @@ export default class XpCommand extends SlashCommand {
 				value: stripIndents`
 					${Formatters.codeBlock('Skills')}
 					Average skill level: ${Formatters.bold(this.client.formatDecimalNumber(skillAverage))} [${Formatters.bold(this.client.formatDecimalNumber(trueAverage))}] - ${Formatters.bold('Δ')}: ${Formatters.bold(this.client.formatDecimalNumber(skillAverage - skillAverageOffset))} [${Formatters.bold(this.client.formatDecimalNumber(trueAverage - trueAverageOffset))}]
+					${player.skyBlockData.skillApiEnabled ? '' : `${X_EMOJI} API disabled`}
 				`,
 			});
 
 		// skills
 		for (const skill of SKILLS) {
-			const SKILL_ARGUMENT = `${skill}Xp`;
-			const OFFSET_ARGUMENT = `${skill}Xp${OFFSET}`;
-			const { progressLevel } = player.getSkillLevel(skill);
+			logger.debug(player[`skyBlockData${OFFSET}`], player[`skyBlockData${OFFSET}`][skill], OFFSET, skill)
 
 			embed.addFields({
 				name: upperCaseFirstChar(skill),
 				value: stripIndents`
-					${Formatters.bold('Lvl:')} ${progressLevel}
-					${Formatters.bold('XP:')} ${this.client.formatNumber(player[SKILL_ARGUMENT], 0, Math.round)}
-					${Formatters.bold('Δ:')} ${this.client.formatNumber(player[SKILL_ARGUMENT] - player[OFFSET_ARGUMENT], 0, Math.round)}
+					${Formatters.bold('Lvl:')} ${player.getSkillLevel(skill).progressLevel}
+					${Formatters.bold('XP:')} ${this.client.formatNumber(player.skyBlockData[skill], 0, Math.round)}
+					${Formatters.bold('Δ:')} ${this.client.formatNumber(player.skyBlockData[skill] - player[`skyBlockData${OFFSET}`][skill], 0, Math.round)}
 				`,
 				inline: true,
 			});
@@ -80,15 +87,12 @@ export default class XpCommand extends SlashCommand {
 		MessageEmbedUtil.padFields(embed);
 
 		for (const skill of COSMETIC_SKILLS) {
-			const SKILL_ARGUMENT = `${skill}Xp`;
-			const { progressLevel } = player.getSkillLevel(skill);
-
 			embed.addFields({
 				name: upperCaseFirstChar(skill),
 				value: stripIndents`
-					${Formatters.bold('Lvl:')} ${progressLevel}
-					${Formatters.bold('XP:')} ${this.client.formatNumber(player[SKILL_ARGUMENT], 0, Math.round)}
-					${Formatters.bold('Δ:')} ${this.client.formatNumber(player[SKILL_ARGUMENT] - player[`${skill}Xp${OFFSET}`], 0, Math.round)}
+					${Formatters.bold('Lvl:')} ${player.getSkillLevel(skill).progressLevel}
+					${Formatters.bold('XP:')} ${this.client.formatNumber(player.skyBlockData[skill], 0, Math.round)}
+					${Formatters.bold('Δ:')} ${this.client.formatNumber(player.skyBlockData[skill] - player[`skyBlockData${OFFSET}`][skill], 0, Math.round)}
 				`,
 				inline: true,
 			});
@@ -109,14 +113,12 @@ export default class XpCommand extends SlashCommand {
 		});
 
 		for (const slayer of SLAYERS) {
-			const SLAYER_ARGUMENT = `${slayer}Xp`;
-
 			embed.addFields({
 				name: upperCaseFirstChar(slayer),
 				value: stripIndents`
 					${Formatters.bold('Lvl:')} ${player.getSlayerLevel(slayer)}
-					${Formatters.bold('XP:')} ${this.client.formatNumber(player[SLAYER_ARGUMENT])}
-					${Formatters.bold('Δ:')} ${this.client.formatNumber(player[SLAYER_ARGUMENT] - player[`${slayer}Xp${OFFSET}`], 0, Math.round)}
+					${Formatters.bold('XP:')} ${this.client.formatNumber(player.skyBlockData[slayer])}
+					${Formatters.bold('Δ:')} ${this.client.formatNumber(player.skyBlockData[slayer] - player[`skyBlockData${OFFSET}`][slayer], 0, Math.round)}
 				`,
 				inline: true,
 			});
@@ -131,22 +133,21 @@ export default class XpCommand extends SlashCommand {
 
 		// dungeons
 		for (const type of DUNGEON_TYPES_AND_CLASSES) {
-			const DUNGEON_ARGUMENT = `${type}Xp`;
-			const { progressLevel } = player.getSkillLevel(type);
-
 			embed.addFields({
 				name: upperCaseFirstChar(type),
 				value: stripIndents`
-					${Formatters.bold('Lvl:')} ${progressLevel}
-					${Formatters.bold('XP:')} ${this.client.formatNumber(player[DUNGEON_ARGUMENT], 0, Math.round)}
-					${Formatters.bold('Δ:')} ${this.client.formatNumber(player[DUNGEON_ARGUMENT] - player[`${type}Xp${OFFSET}`], 0, Math.round)}
+					${Formatters.bold('Lvl:')} ${player.getSkillLevel(type).progressLevel}
+					${Formatters.bold('XP:')} ${this.client.formatNumber(player.skyBlockData[type], 0, Math.round)}
+					${Formatters.bold('Δ:')} ${this.client.formatNumber(player.skyBlockData[type] - player[`skyBlockData${OFFSET}`][type], 0, Math.round)}
 				`,
 				inline: true,
 			});
 		}
 
-		const { totalWeight, weight, overflow } = player.getSenitherWeight();
-		const { totalWeight: totalWeightOffet, weight: weightOffset, overflow: overflowOffset } = player.getSenitherWeight(OFFSET);
+		const { totalWeight: senitherTotalWeight, weight: senitherWeight, overflow: senitherOverflow } = player.getSenitherWeight();
+		const { totalWeight: senitherTotalWeightOffet, weight: senitherWeightOffset, overflow: senitherOverflowOffset } = player.getSenitherWeight(OFFSET);
+		const { totalWeight: lilyTotalWeight, weight: lilyWeight, overflow: lilyOverflow } = player.getLilyWeight();
+		const { totalWeight: lilyTotalWeightOffet, weight: lilyWeightOffset, overflow: lilyOverflowOffset } = player.getLilyWeight(OFFSET);
 
 		MessageEmbedUtil.padFields(embed)
 			.addFields({
@@ -161,10 +162,17 @@ export default class XpCommand extends SlashCommand {
 				`,
 				inline: true,
 			}, {
-				name: 'Weight',
+				name: 'Senither Weight',
 				value: stripIndents`
-					${Formatters.bold('Total')}: ${this.client.formatDecimalNumber(totalWeight)} [ ${this.client.formatDecimalNumber(weight)} + ${this.client.formatDecimalNumber(overflow)} ]
-					${Formatters.bold('Δ:')} ${this.client.formatDecimalNumber(totalWeight - totalWeightOffet)} [ ${this.client.formatDecimalNumber(weight - weightOffset)} + ${this.client.formatDecimalNumber(overflow - overflowOffset)} ]
+					${Formatters.bold('Total')}: ${this.client.formatDecimalNumber(senitherTotalWeight)} [ ${this.client.formatDecimalNumber(senitherWeight)} + ${this.client.formatDecimalNumber(senitherOverflow)} ]
+					${Formatters.bold('Δ:')} ${this.client.formatDecimalNumber(senitherTotalWeight - senitherTotalWeightOffet)} [ ${this.client.formatDecimalNumber(senitherWeight - senitherWeightOffset)} + ${this.client.formatDecimalNumber(senitherOverflow - senitherOverflowOffset)} ]
+				`,
+				inline: true,
+			}, {
+				name: 'Lily Weight',
+				value: stripIndents`
+					${Formatters.bold('Total')}: ${this.client.formatDecimalNumber(lilyTotalWeight)} [ ${this.client.formatDecimalNumber(lilyWeight)} + ${this.client.formatDecimalNumber(lilyOverflow)} ]
+					${Formatters.bold('Δ:')} ${this.client.formatDecimalNumber(lilyTotalWeight - lilyTotalWeightOffet)} [ ${this.client.formatDecimalNumber(lilyWeight - lilyWeightOffset)} + ${this.client.formatDecimalNumber(lilyOverflow - lilyOverflowOffset)} ]
 				`,
 				inline: true,
 			});

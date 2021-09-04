@@ -12,6 +12,7 @@ import {
 	RELOAD_EMOJI,
 	RIGHT_EMOJI,
 	SKILLS,
+	SKYBLOCK_DATA,
 	SLAYERS,
 	XP_OFFSETS_CONVERTER,
 	XP_OFFSETS_SHORT,
@@ -479,6 +480,7 @@ function createGainedLeaderboardData(client, { hypixelGuild, user, offset, xpTyp
 	switch (xpType) {
 		case 'slayer': {
 			title = 'Slayer XP Gained Leaderboard';
+			/** @param {import('../structures/database/models/Player').Player} player */
 			dataConverter = player => ({
 				ign: player.ign,
 				discordId: player.discordId,
@@ -493,6 +495,7 @@ function createGainedLeaderboardData(client, { hypixelGuild, user, offset, xpTyp
 
 		case 'skill-average': {
 			title = 'Skill Average Gained Leaderboard';
+			/** @param {import('../structures/database/models/Player').Player} player */
 			dataConverter = (player) => {
 				const { skillAverage, trueAverage } = player.getSkillAverage(CURRENT_OFFSET);
 				const { skillAverage: skillAverageOffset, trueAverage: trueAverageOffset } = player.getSkillAverage(offset);
@@ -517,12 +520,13 @@ function createGainedLeaderboardData(client, { hypixelGuild, user, offset, xpTyp
 
 		case 'purge': {
 			title = `${hypixelGuild || ''} Purge List (${config.get('PURGE_LIST_OFFSET')} days interval)`;
-			dataConverter = (player) => {
+			/** @param {import('../structures/database/models/Player').Player} player */
+			dataConverter = async (player) => {
 				const { totalWeight } = player.getSenitherWeight();
 				const startIndex = player.alchemyXpHistory.length - 1 - config.get('PURGE_LIST_OFFSET');
 				// use weight from the first time they got alch xp, assume player has not been tracked before
 				const XP_TRACKING_START = player.alchemyXpHistory.findIndex((xp, index) => index >= startIndex && xp !== 0);
-				const { totalWeight: totalWeightOffet } = player.getSenitherWeightHistory(XP_TRACKING_START);
+				const { totalWeight: totalWeightOffet } = await player.getSenitherWeightHistory(XP_TRACKING_START);
 				const gainedWeight = totalWeight - totalWeightOffet;
 				const gainedGuildXp = player.guildXp - player.guildXpHistory[XP_TRACKING_START];
 				return {
@@ -555,6 +559,7 @@ function createGainedLeaderboardData(client, { hypixelGuild, user, offset, xpTyp
 
 		case 'weight': {
 			title = 'Weight Gained Leaderboard';
+			/** @param {import('../structures/database/models/Player').Player} player */
 			dataConverter = (player) => {
 				const { weight, overflow, totalWeight } = player.getSenitherWeight(CURRENT_OFFSET);
 				const { weight: weightOffset, overflow: overflowOffset, totalWeight: totalWeightOffet } = player.getSenitherWeight(offset);
@@ -581,15 +586,26 @@ function createGainedLeaderboardData(client, { hypixelGuild, user, offset, xpTyp
 
 		default: {
 			title = `${upperCaseFirstChar(xpType)} XP Gained Leaderboard`;
-			const XP_ARGUMENT = `${xpType}Xp${CURRENT_OFFSET}`;
-			const OFFSET_ARGUMENT = `${xpType}Xp${offset}`;
-			dataConverter = player => ({
-				ign: player.ign,
-				discordId: player.discordId,
-				xpLastUpdatedAt: player.xpLastUpdatedAt,
-				paid: player.paid,
-				sortingStat: player[XP_ARGUMENT] - player[OFFSET_ARGUMENT],
-			});
+			const CURRENT_DATA = `${xpType}Xp${CURRENT_OFFSET}`;
+			const OFFSET_DATA = `${xpType}Xp${offset}`;
+
+			if (Reflect.has(SKYBLOCK_DATA.skillXp, xpType)) {
+				/** @param {import('../structures/database/models/Player').Player} player */
+				dataConverter = player => ({
+					ign: player.ign,
+					discordId: player.discordId,
+					xpLastUpdatedAt: player.xpLastUpdatedAt,
+					paid: player.paid,
+					sortingStat: player[`skyBlockData${CURRENT_OFFSET}`].skillXp[xpType] - player[`skyBlockData${offset}`].skillXp[xpType],
+				});
+			} else if (Reflect.has(SKYBLOCK_DATA.slayerXp, xpType)) {
+
+			} else if (Reflect.has(SKYBLOCK_DATA.dungeonXp, xpType)) {
+
+			} else {
+
+			}
+
 			playerData = getPlayerData(client, hypixelGuild, dataConverter);
 			totalStats = Formatters.bold(client.formatNumber(playerData.reduce((acc, player) => acc + player.sortingStat, 0), 0, Math.round));
 			getEntry = player => client.formatNumber(player.sortingStat, Math.round(playerData[0]?.sortingStat).toLocaleString(NUMBER_FORMAT).length, Math.round);

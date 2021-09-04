@@ -5,22 +5,25 @@ import { stripIndents } from 'common-tags';
 import { RateLimitError } from '@zikeji/hypixel';
 import {
 	CATACOMBS_ROLES,
+	DATA_KEYS,
 	DELIMITER_ROLES,
+	DUNGEON_TYPES_AND_CLASSES,
+	DATA_DEFAULTS,
 	GUILD_ID_BRIDGER,
 	GUILD_ID_ERROR,
-	HISTORY_KEYS,
+	HISTORY_DATA_KEYS,
 	NICKNAME_MAX_CHARS,
 	OFFSET_FLAGS,
 	SKILL_AVERAGE_ROLES,
 	SKILL_ROLES,
 	SKILLS,
+	SKILLS_INCL_COSMETIC,
 	SKYBLOCK_DATA,
 	SLAYER_ROLES,
 	SLAYER_TOTAL_ROLES,
 	SLAYERS,
 	UNKNOWN_IGN,
 	XP_OFFSETS,
-	XP_TYPES,
 } from '../../../constants/index.js';
 import { HypixelGuildManager } from '../managers/HypixelGuildManager.js';
 import { GuildMemberUtil, GuildUtil, MessageEmbedUtil, UserUtil } from '../../../util/index.js';
@@ -120,7 +123,56 @@ export class Player extends Model {
 		this.discordMemberUpdatesDisabled;
 
 		// player is in a guild -> xp tracking enabled
-		if (!this.notInGuild) this.createDefaults();
+		if (!this.notInGuild) this.setDefaults();
+
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockData;
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockDataCompetitionStart;
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockDataCompetitionEnd;
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockDataOffsetMayor;
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockDataOffsetWeek;
+		/**
+		 * @type {?import('../../../functions/index').skyBlockData}
+		 */
+		this.skyBlockDataOffsetMonth;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXp;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXpCompetitionStart;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXpCompetitionEnd;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXpOffsetMayor;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXpOffsetWeek;
+		/**
+		 * @type {?number}
+		 */
+		this.guildXpOffsetMonth;
 
 		/**
 		 * @type {string}
@@ -168,7 +220,7 @@ export class Player extends Model {
 					if (HypixelGuildManager.PSEUDO_GUILD_IDS.includes(value)) {
 						this.skyBlockData = null;
 					} else {
-						this.createDefaults();
+						this.setDefaults();
 					}
 					this.setDataValue('guildId', value);
 				},
@@ -183,8 +235,8 @@ export class Player extends Model {
 				defaultValue: false,
 				allowNull: false,
 				set(value) {
-					this.setDataValue('inDiscord', value);
 					if (!value) this.uncacheMember();
+					this.setDataValue('inDiscord', value);
 				},
 			},
 			mutedTill: {
@@ -245,26 +297,6 @@ export class Player extends Model {
 				allowNull: false,
 			},
 
-			// API data
-			skyBlockData: {
-				type: DataTypes.JSONB,
-				defaultValue: null,
-				allowNull: true,
-			},
-			skyBlockDataHistory: {
-				type: DataTypes.ARRAY(DataTypes.JSONB),
-				defaultValue: null,
-				allowNull: true,
-			},
-			...Object.fromEntries(XP_OFFSETS.map(offset => [
-				`skyBlockData${offset}`,
-				{
-					type: DataTypes.JSONB,
-					defaultValue: null,
-					allowNull: true,
-				},
-			])),
-
 			// hypixel guild exp
 			guildXpDay: {
 				type: DataTypes.STRING,
@@ -276,25 +308,27 @@ export class Player extends Model {
 				defaultValue: 0,
 				allowNull: false,
 			},
-			guildXp: {
-				type: DataTypes.DECIMAL,
+		};
+
+		for (const [ key, type ] of Object.entries(DATA_KEYS)) {
+			dataObject[key] = {
+				type,
 				defaultValue: null,
 				allowNull: true,
-			},
-			guildXpHistory: {
-				type: DataTypes.ARRAY(DataTypes.DECIMAL),
+			};
+			dataObject[`${key}History`] = {
+				type: DataTypes.ARRAY(type),
 				defaultValue: null,
 				allowNull: true,
-			},
-			...Object.fromEntries(XP_OFFSETS.map(offset => [
-				`guildXp${offset}`,
-				{
-					type: DataTypes.DECIMAL,
+			};
+			for (const offset of XP_OFFSETS) {
+				dataObject[`${key}${offset}`] = {
+					type,
 					defaultValue: null,
 					allowNull: true,
-				},
-			])),
-		};
+				};
+			}
+		}
 
 		return super.init(dataObject, {
 			sequelize,
@@ -560,10 +594,10 @@ export class Player extends Model {
 			if (this.skyBlockData.skillApiEnabled) {
 				// reset skill xp if no mining xp offset
 				for (const offset of XP_OFFSETS) {
-					if (this[`skyBlockData${offset}`].skillXp.mining !== 0) continue;
+					if (this[`skyBlockData${offset}`].mining !== 0) continue;
 
 					logger.info(`[UPDATE XP]: ${this.logInfo}: resetting '${offset}' skill xp`);
-					await this.resetXp({ offsetToReset: offset, typesToReset: [ 'skillXp' ] });
+					await this.resetXp({ offsetToReset: offset, typesToReset: SKILLS_INCL_COSMETIC });
 				}
 			} else {
 				// log once every hour (during the first update)
@@ -577,12 +611,12 @@ export class Player extends Model {
 			 * slayer
 			 */
 			// reset slayer xp if no zombie xp offset
-			if (this.skyBlockData.slayerXp.zombie !== 0) {
+			if (this.skyBlockData.zombie !== 0) {
 				for (const offset of XP_OFFSETS) {
 					if (this[`skyBlockData${offset}`].slayerXp.zombie !== 0) continue;
 
 					logger.info(`[UPDATE XP]: ${this.logInfo}: resetting '${offset}' slayer xp`);
-					await this.resetXp({ offsetToReset: offset, typesToReset: [ 'slayerXp' ] });
+					await this.resetXp({ offsetToReset: offset, typesToReset: SLAYERS });
 				}
 			}
 
@@ -590,12 +624,12 @@ export class Player extends Model {
 			 * dungeons
 			 */
 			// reset dungeons xp if no catacombs xp offset
-			if (this.skyBlockData.dungeonXp.catacombs !== 0) {
+			if (this.skyBlockData.catacombs !== 0) {
 				for (const offset of XP_OFFSETS) {
 					if (this[`skyBlockData${offset}`].dungeonXp.catacombs !== 0) continue;
 
 					logger.info(`[UPDATE XP]: ${this.logInfo}: resetting '${offset}' dungeon xp`);
-					await this.resetXp({ offsetToReset: offset, typesToReset: [ 'dungeonXp' ] });
+					await this.resetXp({ offsetToReset: offset, typesToReset: DUNGEON_TYPES_AND_CLASSES });
 				}
 			}
 
@@ -1157,7 +1191,7 @@ export class Player extends Model {
 
 		if (!profiles?.length) {
 			this.mainProfileId = null;
-			await this.resetXp({ offsetToReset: 'current' });
+			await this.resetXp({ offsetToReset: OFFSET_FLAGS.CURRENT });
 
 			throw `${this.logInfo}: no SkyBlock profiles`;
 		}
@@ -1228,41 +1262,49 @@ export class Player extends Model {
 
 	/**
 	 * transfers xp offsets
-	 * @param {obejct} options
+	 * @param {object} options
 	 * @param {string} options.from
 	 * @param {string} options.to
 	 * @param {string[]} [options.types]
 	 * @param {boolean} [options.setToNull]
 	 */
-	async transferXp({ from = '', to, types = XP_TYPES, setToNull = this.notInGuild }) {
+	async transferXp({ from = '', to, types = Object.keys(DATA_KEYS), setToNull = this.notInGuild }) {
 		for (const type of types) {
-			if (Reflect.has(this.skyBlockData ?? SKYBLOCK_DATA, type)) {
-				if (this.skyBlockData === null) {
+			if (Reflect.has(DATA_KEYS, type)) {
+				this[`${type}${to}`] = setToNull
+					? null
+					: this[`${type}${from}`];
+				continue;
+			}
+
+			if (Reflect.has(SKYBLOCK_DATA, type)) {
+				if (this.skyBlockData === null || setToNull) {
 					this[`skyBlockData${to}`] = null;
 					continue;
 				}
 
-				this[`skyBlockData${to}`][type] = { ...this[`skyBlockData${from}`][type] };
+				this[`skyBlockData${to}`][type] = this[`skyBlockData${from}`][type];
 
 				// transfer additional data
 				switch (type) {
-					case 'skillXp':
+					case 'mining':
 						this[`skyBlockData${to}`].farmingLevelCap = this[`skyBlockData${from}`].farmingLevelCap;
 						this[`skyBlockData${to}`].skillApiEnabled = this[`skyBlockData${from}`].skillApiEnabled;
 						break;
 
-					case 'dungeonXp':
-						this[`skyBlockData${to}`].dungeonCompletions.normal = { ...this[`skyBlockData${from}`].dungeonCompletions.normal };
-						this[`skyBlockData${to}`].dungeonCompletions.master = { ...this[`skyBlockData${from}`].dungeonCompletions.master };
+					case 'catacombs':
+						for (let i = 1; i <= 10; ++i) {
+							this[`skyBlockData${to}`][`catacombsFloor${i}`] = this[`skyBlockData${from}`][`catacombsFloor${i}`];
+							this[`skyBlockData${to}`][`masterCatacombsFloor${i}`] = this[`skyBlockData${from}`][`masterCatacombsFloor${i}`];
+						}
 						break;
 				}
 
 				this.changed(`skyBlockData${to}`, true);
-			} else {
-				this[`${type}${to}`] = setToNull
-					? null
-					: this[`${type}${from}`];
+				continue;
 			}
+
+			throw new Error(`Unknown type ${type}`);
 		}
 
 		return this.save();
@@ -1271,75 +1313,46 @@ export class Player extends Model {
 	/**
 	 * fills skyBlockData and guildXp with default values if nullish
 	 */
-	createDefaults() {
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockData ??= transformAPIData();
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockDataCompetitionStart ??= transformAPIData();
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockDataCompetitionEnd ??= transformAPIData();
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockDataOffsetMayor ??= transformAPIData();
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockDataOffsetWeek ??= transformAPIData();
-		/**
-		 * @type {?import('../../../functions/index').skyBlockData}
-		 */
-		this.skyBlockDataOffsetMonth ??= transformAPIData();
-		/**
-		 * @type {?number}
-		 */
-		this.guildXp ??= 0;
-		/**
-		 * @type {?number}
-		 */
-		this.guildXpCompetitionStart ??= 0;
-		/**
-		 * @type {?number}
-		 */
-		this.guildXpCompetitionEnd ??= 0;
-		/**
-		 * @type {?number}
-		 */
-		this.guildXpOffsetMayor ??= 0;
-		/**
-		 * @type {?number}
-		 */
-		this.guildXpOffsetWeek ??= 0;
-		/**
-		 * @type {?number}
-		 */
-		this.guildXpOffsetMonth ??= 0;
+	setDefaults() {
+		for (const key of Object.keys(DATA_KEYS)) {
+			this[key] ??= DATA_DEFAULTS[key];
+			this[`${key}History`] ??= DATA_KEYS[key];
+
+			for (const offset of XP_OFFSETS) {
+				this[`${key}${offset}`] = DATA_KEYS[key];
+			}
+		}
 
 		return this;
 	}
 
 	/**
 	 * shifts the daily history array and pushes a new entry
-	 * @param {string} key
+	 * @param {string[]} typesToReset
 	 */
-	async resetHistory() {
+	async resetHistory(typesToReset = HISTORY_DATA_KEYS) {
 		const toUpdate = {};
 
-		for (const [ key, historyKey ] of HISTORY_KEYS) {
-			let history = await this.fetchHistory(key);
+		for (const keyInput of typesToReset) {
+			let key;
+			let historyKey;
+
+			if (keyInput.endsWith('History')) {
+				key = keyInput.slice(0, -'History'.length);
+				historyKey = keyInput;
+			} else {
+				key = keyInput;
+				historyKey = `${key}History`;
+			}
+
+			let history = await this.fetchHistory(historyKey);
 
 			// no history
 			if (history === null) continue;
 
 			history.push(this.notInGuild
 				? null // player is not being tracked
-				: (this[key] ?? this.createDefaults()), // player is being tracked
+				: (this[key] ?? this.setDefaults()), // player is being tracked
 			);
 
 			// save only the last x entries
@@ -1369,7 +1382,7 @@ export class Player extends Model {
 	 * @param {boolean} [options.setToNull]
 	 * @returns {Promise<this>}
 	 */
-	async resetXp({ offsetToReset = null, typesToReset = [ 'guildXp', ...XP_TYPES ], setToNull } = {}) {
+	async resetXp({ offsetToReset = null, typesToReset = Object.keys(DATA_KEYS), setToNull } = {}) {
 		switch (offsetToReset) {
 			case null:
 				// no offset type specifies -> resetting everything
@@ -1377,19 +1390,52 @@ export class Player extends Model {
 				return this.resetXp({ offsetToReset: OFFSET_FLAGS.DAY, typesToReset });
 
 			case OFFSET_FLAGS.DAY: {
-				return await this.resetHistory();
+				return await this.resetHistory(typesToReset);
 			}
 
-			case OFFSET_FLAGS.CURRENT:
+			case OFFSET_FLAGS.CURRENT: {
 				for (const type of typesToReset) {
-					if (Reflect.has(this.skyBlockData, type)) {
-						this.skyBlockData[type] = transformAPIData()[type];
-						this.changed('skyBlockData', true);
-					} else {
-						this[type] = 0;
+					if (Reflect.has(DATA_DEFAULTS, type)) {
+						this[type] = setToNull
+							? null
+							: DATA_DEFAULTS[type];
+						continue;
 					}
+
+					if (Reflect.has(SKYBLOCK_DATA, type)) {
+						if (this.skyBlockData === null || setToNull) {
+							this.skyBlockData = null;
+							continue;
+						}
+
+						const { skyBlockData } = DATA_DEFAULTS;
+
+						this.skyBlockData[type] = skyBlockData[type];
+
+						// transfer additional data
+						switch (type) {
+							case 'mining':
+								this.skyBlockData.farmingLevelCap = skyBlockData.farmingLevelCap;
+								this.skyBlockData.skillApiEnabled = skyBlockData.skillApiEnabled;
+								break;
+
+							case 'catacombs':
+								for (let i = 1; i <= 10; ++i) {
+									this.skyBlockData[`catacombsFloor${i}`] = skyBlockData[`catacombsFloor${i}`];
+									this.skyBlockData[`masterCatacombsFloor${i}`] = skyBlockData[`masterCatacombsFloor${i}`];
+								}
+								break;
+						}
+
+						this.changed('skyBlockData', true);
+						continue;
+					}
+
+					throw new Error(`Unknown type ${type}`);
 				}
+
 				return this.save();
+			}
 
 			default:
 				return this.transferXp({
@@ -1616,11 +1662,15 @@ export class Player extends Model {
 	 * @returns {Promise<number[] | import('../../../functions/skyblock.js').skyBlockData[]>}
 	 */
 	async fetchHistory(key) {
-		return this[`${key}History`] ?? (await this.client.players.model.findOne({
+		const HISTORY_KEY = key.endsWith('History')
+			? key
+			: `${key}History`;
+
+		return this[HISTORY_KEY] ?? (await this.client.players.model.findOne({
 			where: this.where(),
-			attributes: [ `${key}History` ],
+			attributes: [ HISTORY_KEY ],
 			raw: true,
-		}))?.[`${key}History`] ?? [];
+		}))?.[HISTORY_KEY] ?? [];
 	}
 
 	/**

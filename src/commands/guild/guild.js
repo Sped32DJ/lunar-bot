@@ -4,7 +4,7 @@ import pkg from 'sequelize';
 const { Op } = pkg;
 import ms from 'ms';
 import { demote, historyErrors, invite, kick, mute, logErrors, promote, setRank, topErrors, unmute } from '../../structures/chat_bridge/constants/index.js';
-import { EMBED_DESCRIPTION_MAX_CHARS, GUILD_ID_BRIDGER, UNKNOWN_IGN } from '../../constants/index.js';
+import { EMBED_DESCRIPTION_MAX_CHARS, GUILD_ID_BRIDGER, HISTORY_DATA_KEYS, UNKNOWN_IGN } from '../../constants/index.js';
 import { requiredPlayerOption, optionalPlayerOption, pageOption, requiredIgnOption, targetOption, forceOption, buildGuildOption } from '../../structures/commands/commonOptions.js';
 import { InteractionUtil, UserUtil } from '../../util/index.js';
 import { autocorrect, getIdFromString, logger, removeMcFormatting, stringToMS, trim } from '../../functions/index.js';
@@ -165,6 +165,9 @@ export default class GuildCommand extends SlashCommand {
 									guildId: GUILD_ID_BRIDGER,
 									ign: UNKNOWN_IGN,
 									inDiscord: true,
+								},
+								attributes: {
+									exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 								},
 							}))[0];
 						} catch (error) {

@@ -15,7 +15,7 @@ import {
 	randomPadding,
 	UNICODE_TO_EMOJI_NAME,
 } from '../constants/index.js';
-import { GUILD_ID_BRIDGER, STOP_EMOJI, UNKNOWN_IGN, X_EMOJI } from '../../../constants/index.js';
+import { GUILD_ID_BRIDGER, HISTORY_DATA_KEYS, STOP_EMOJI, UNKNOWN_IGN, X_EMOJI } from '../../../constants/index.js';
 import { createBot } from '../MinecraftBot.js';
 import { GuildMemberUtil, MessageUtil, UserUtil } from '../../../util/index.js';
 import { MessageCollector } from '../MessageCollector.js';
@@ -290,6 +290,9 @@ export class MinecraftChatManager extends ChatManager {
 							guildId: GUILD_ID_BRIDGER,
 							ign: UNKNOWN_IGN,
 							inDiscord: true,
+						},
+						attributes: {
+							exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 						},
 					}))[0];
 

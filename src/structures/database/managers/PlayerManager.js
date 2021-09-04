@@ -3,9 +3,24 @@ import { setTimeout as sleep } from 'timers/promises';
 import pkg from 'sequelize';
 const { Op } = pkg;
 import { CronJob } from 'cron';
-import { EMBED_FIELD_MAX_CHARS, EMBED_MAX_CHARS, EMBED_MAX_FIELDS, MAYOR_CHANGE_INTERVAL, OFFSET_FLAGS } from '../../../constants/index.js';
+import {
+	EMBED_FIELD_MAX_CHARS,
+	EMBED_MAX_CHARS,
+	EMBED_MAX_FIELDS,
+	HISTORY_DATA_KEYS,
+	MAYOR_CHANGE_INTERVAL,
+	OFFSET_FLAGS,
+} from '../../../constants/index.js';
 import { hypixel } from '../../../api/hypixel.js';
-import { autocorrect, compareAlphabetically, getWeekOfYear, logger, safePromiseAll, upperCaseFirstChar } from '../../../functions/index.js';
+import {
+	autocorrect,
+	buildNullDataTransactions,
+	compareAlphabetically,
+	getWeekOfYear,
+	logger,
+	safePromiseAll,
+	upperCaseFirstChar,
+} from '../../../functions/index.js';
 import { ModelManager } from './ModelManager.js';
 
 
@@ -53,10 +68,7 @@ export class PlayerManager extends ModelManager {
 				},
 			},
 			attributes: {
-				exclude: [ // don't load history arrays
-					'dataHistory',
-					'guildXpHistory',
-				],
+				exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 			},
 		});
 
@@ -118,12 +130,17 @@ export class PlayerManager extends ModelManager {
 
 	/**
 	 * add a player to the db and db cache
-	 * @param {object} options options for the new db entry
+	 * @param {import('sequelize').CreateOptions} options options for the new db entry
 	 * @param {boolean} isAddingSingleEntry wether to call sortAlphabetically() and updateXp() after adding the new entry
 	 */
 	async add(options = {}, isAddingSingleEntry = true) {
 		/** @type {import('../models/Player').Player} */
-		const newPlayer = await super.add(options);
+		const newPlayer = await super.add({
+			...options,
+			returning: {
+				exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
+			},
+		});
 
 		this.client.hypixelGuilds.sweepPlayerCache(newPlayer.guildId);
 
@@ -147,6 +164,7 @@ export class PlayerManager extends ModelManager {
 				guildId: null,
 				paid: false,
 			},
+			attributes: [ this.primaryKey, 'ign' ],
 		});
 
 		await safePromiseAll(playersToSweep.map(async player => player.destroy()));
@@ -484,10 +502,7 @@ export class PlayerManager extends ModelManager {
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.COMPETITION_START }),
 			this.client.config.set('COMPETITION_RUNNING', true),
 			this.client.config.set('COMPETITION_SCHEDULED', false),
-			this.updateUncachedPlayers({
-				[`skyBlockData${OFFSET_FLAGS.COMPETITION_START}`]: null,
-				[`guildXp${OFFSET_FLAGS.COMPETITION_START}`]: null,
-			}),
+			this.updateUncachedPlayers(buildNullDataTransactions(OFFSET_FLAGS.COMPETITION_START)),
 		]);
 
 		this.client.log(this.client.defaultEmbed
@@ -503,10 +518,7 @@ export class PlayerManager extends ModelManager {
 		await Promise.all([
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.COMPETITION_END }),
 			this.client.config.set('COMPETITION_RUNNING', false),
-			this.updateUncachedPlayers({
-				[`skyBlockData${OFFSET_FLAGS.COMPETITION_END}`]: null,
-				[`guildXp${OFFSET_FLAGS.COMPETITION_END}`]: null,
-			}),
+			this.updateUncachedPlayers(buildNullDataTransactions(OFFSET_FLAGS.COMPETITION_END)),
 		]);
 
 		this.client.log(this.client.defaultEmbed
@@ -526,10 +538,7 @@ export class PlayerManager extends ModelManager {
 		await Promise.all([
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.MAYOR }),
 			this.client.config.set('LAST_MAYOR_XP_RESET_TIME', currentMayorTime),
-			this.updateUncachedPlayers({
-				[`skyBlockData${OFFSET_FLAGS.MAYOR}`]: null,
-				[`guildXp${OFFSET_FLAGS.MAYOR}`]: null,
-			}),
+			this.updateUncachedPlayers(buildNullDataTransactions(OFFSET_FLAGS.MAYOR)),
 		]);
 
 		this.client.log(this.client.defaultEmbed
@@ -548,8 +557,6 @@ export class PlayerManager extends ModelManager {
 	 * shifts the daily xp array, updates the config and logs the event
 	 */
 	async #performDailyXpReset() {
-		const HISTORY_KEYS = [ 'skyBlockDataHistory', 'guildXpHistory' ];
-
 		await Promise.all([
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.DAY }),
 			this.client.config.set('LAST_DAILY_XP_RESET_TIME', Date.now()),
@@ -557,9 +564,9 @@ export class PlayerManager extends ModelManager {
 				const notInGuildWithHistory = await this.model.findAll({
 					where: {
 						guildId: null,
-						guildXpHistory: { [Op.ne]: null },
+						[Op.or]: Object.fromEntries(HISTORY_DATA_KEYS.map(key => [ key, { [Op.ne]: null }])),
 					},
-					attributes: [ this.primaryKey, ...HISTORY_KEYS ],
+					attributes: [ this.primaryKey, ...HISTORY_DATA_KEYS ],
 				});
 
 				if (!notInGuildWithHistory.length) return;
@@ -567,7 +574,7 @@ export class PlayerManager extends ModelManager {
 				const DATA_HISTORY_MAX_LENGTH = this.client.config.get('DATA_HISTORY_MAX_LENGTH');
 
 				return Promise.all(notInGuildWithHistory.map((player) => {
-					for (const historyKey of HISTORY_KEYS) {
+					for (const historyKey of HISTORY_DATA_KEYS) {
 						if (!player[historyKey]) continue;
 
 						player[historyKey].push(null);
@@ -598,10 +605,7 @@ export class PlayerManager extends ModelManager {
 		await Promise.all([
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.WEEK }),
 			this.client.config.set('LAST_WEEKLY_XP_RESET_TIME', Date.now()),
-			this.updateUncachedPlayers({
-				[`skyBlockData${OFFSET_FLAGS.WEEK}`]: null,
-				[`guildXp${OFFSET_FLAGS.WEEK}`]: null,
-			}),
+			this.updateUncachedPlayers(buildNullDataTransactions(OFFSET_FLAGS.WEEK)),
 		]);
 
 		this.client.log(this.client.defaultEmbed
@@ -619,10 +623,7 @@ export class PlayerManager extends ModelManager {
 		await Promise.all([
 			this.resetXp({ offsetToReset: OFFSET_FLAGS.MONTH }),
 			this.client.config.set('LAST_MONTHLY_XP_RESET_TIME', Date.now()),
-			this.updateUncachedPlayers({
-				[`skyBlockData${OFFSET_FLAGS.MONTH}`]: null,
-				[`guildXp${OFFSET_FLAGS.MONTH}`]: null,
-			}),
+			this.updateUncachedPlayers(buildNullDataTransactions(OFFSET_FLAGS.MONTH)),
 		]);
 
 		this.client.log(this.client.defaultEmbed

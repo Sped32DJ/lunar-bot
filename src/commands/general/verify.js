@@ -4,6 +4,7 @@ const { Op } = pkg;
 import { oneLine, commaListsOr } from 'common-tags';
 import { hypixel } from '../../api/hypixel.js';
 import { mojang } from '../../api/mojang.js';
+import { HISTORY_DATA_KEYS } from '../../constants/index.js';
 import { requiredIgnOption } from '../../structures/commands/commonOptions.js';
 import { InteractionUtil, UserUtil } from '../../util/index.js';
 import { logger } from '../../functions/index.js';
@@ -88,6 +89,9 @@ export default class VerifyCommand extends SlashCommand {
 				defaults: {
 					ign,
 					guildId,
+				},
+				attributes: {
+					exclude: HISTORY_DATA_KEYS, // don't cache  history arrays
 				},
 			});
 		} catch (error) {
