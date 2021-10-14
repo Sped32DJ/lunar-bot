@@ -74,6 +74,10 @@ export class HypixelMessage {
 	content: string;
 	spam: boolean;
 	declare commandData: CommandData | null;
+	/**
+	 * child logger
+	 */
+	declare logger: typeof logger;
 
 	/**
 	 * @param chatBridge
@@ -122,6 +126,12 @@ export class HypixelMessage {
 			// message was sent from the bot -> don't parse input
 			if (this.me) {
 				this.commandData = null;
+				this.logger = logger.child({
+					type: 'HypixelMessage',
+					user: this.author.ign,
+					channel: this.type,
+					content: this.content,
+				});
 				return;
 			}
 
@@ -137,24 +147,47 @@ export class HypixelMessage {
 			const COMMAND_NAME = args.shift(); // extract first word
 
 			// no command, only ping or prefix
-			this.commandData = (!prefixMatched && this.type !== MESSAGE_TYPES.WHISPER) || !COMMAND_NAME
-				? {
+			if ((!prefixMatched && this.type !== MESSAGE_TYPES.WHISPER) || !COMMAND_NAME) {
+				this.commandData = {
 					name: null,
 					command: null,
 					args,
 					prefix: null,
-				} : {
+				};
+				this.logger = logger.child({
+					type: 'HypixelMessage',
+					user: this.author.ign,
+					channel: this.type,
+					content: this.content,
+				});
+			} else {
+				this.commandData = {
 					name: COMMAND_NAME,
 					command: this.client.chatBridges.commands.getByName(COMMAND_NAME.toLowerCase()),
 					args,
 					prefix: prefixMatched,
 				};
+				this.logger = logger.child({
+					type: 'HypixelMessage',
+					user: this.author.ign,
+					channel: this.type,
+					content: this.content,
+					prefix: prefixMatched,
+					command: this.commandData.command?.name ?? 'invalid',
+					args,
+				});
+			}
 		} else {
 			this.type = null;
 			this.author = null;
 			this.content = this.cleanedContent;
 			this.spam = spamMessages.test(this.content);
 			this.commandData = null;
+			this.logger = logger.child({
+				type: 'HypixelMessage',
+				channel: this.type,
+				content: this.content,
+			});
 		}
 	}
 
@@ -296,7 +329,7 @@ export class HypixelMessage {
 						?? await player?.imageURL
 						?? await mojang.ign(this.author.ign).then(
 							({ uuid }) => uuidToImgurBustURL(this.client, uuid),
-							error => logger.error(error, '[FORWARD TO DC]'),
+							error => this.logger.error(error, '[FORWARD TO DC]'),
 						)
 						?? (member?.guild.me ?? this.client.user)?.displayAvatarURL({ dynamic: true }),
 					allowedMentions: {
@@ -321,7 +354,7 @@ export class HypixelMessage {
 				allowedMentions: { parse: [] },
 			}));
 		} catch (error) {
-			logger.error(error, '[FORWARD TO DC]');
+			this.logger.error(error, '[FORWARD TO DC]');
 			return null;
 		}
 	}
